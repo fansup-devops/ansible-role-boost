@@ -1,0 +1,22 @@
+---
+workspace: /usr/local/src
+
+# If boost_install_from_source is set to false, these two variables define whether
+# to use an additional repo for the package installation, and which boost packages
+# will be installed.
+boost_packages:
+  - libboost1.58-all-dev
+
+# If set to TRUE, boost will be installed from source, using the version set with
+# the 'boost_version' variable instead of using a package.
+boost_install_from_source: false
+boost_install_path: "/usr"
+boost_version: "1.62.0"
+boost_checksum: "sha256:36c96b0f6155c98404091d8ceb48319a28279ca0333fba1ad8611eb90afb2ca0"
+
+# If boost is already installed at and older version, force a new source build.
+# Only applies if boost_install_from_source is `true`.
+boost_install_from_source_force_update: false
+
+# Leave this at it's default.
+boost_reinstall_from_source: false

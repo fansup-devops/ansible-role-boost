@@ -1,0 +1,103 @@
+---
+- name: Ensure boost's dependencies are installed (Debian).
+  apt: "pkg={{ item }} state=installed"
+  with_items:
+    - gcc
+    - make
+    - libc6-dev
+    - xsltproc
+    - docbook-xsl
+    - docbook-xml
+    - libicu-dev
+    - icu-devtools
+    - python2.7
+  when: ansible_os_family == 'Debian'
+
+- name: Get installed version
+  shell: "test -e {{ boost_install_path }}/include/boost/version.hpp && (cat {{ boost_install_path }}/include/boost/version.hpp | grep '^#define BOOST_LIB_VERSION' | sed  -e 's!#define BOOST_LIB_VERSION !!' -e 's!\\x22\\([0-9]*\\)_\\([0-9]*\\)\\x22!\\1.\\2.0!')"
+  changed_when: false
+  failed_when: false
+  register: boost_installed_version
+
+- name: Force boost install if the version numbers do not match
+  set_fact:
+    boost_reinstall_from_source: true
+  when: 'boost_install_from_source_force_update and (boost_installed_version|success and (boost_installed_version.stdout | regex_replace("^.*?([0-9\.]+)$", "\\1") | version_compare(boost_version, operator="!=")))'
+
+- name: Download boost.
+  get_url:
+    url: "https://downloads.sourceforge.net/project/boost/boost/{{ boost_version }}/boost_{{ boost_version | regex_replace('\\.', '_')}}.tar.bz2"
+    dest: "{{ workspace }}/boost_{{ boost_version | regex_replace('\\.', '_')}}.tar.bz2"
+    checksum: "{{ boost_checksum }}"
+  when: boost_installed_version|failed or boost_reinstall_from_source
+
+- name: Expand boost archive.
+  unarchive:
+    src: "{{ workspace }}/boost_{{ boost_version | regex_replace('\\.', '_') }}.tar.bz2"
+    dest: "{{ workspace }}"
+    creates: "{{ workspace }}/boost_{{ boost_version | regex_replace('\\.', '_') }}/README.md"
+    copy: no
+  when: boost_installed_version|failed or boost_reinstall_from_source
+
+- name: Configure boost.
+  command: >
+    ./bootstrap.sh \
+      --prefix={{ boost_install_path }} \
+      --with-toolset=gcc \
+      --with-icu \
+      --with-python=/usr/bin/python2.7
+    chdir={{ workspace }}/boost_{{ boost_version | regex_replace('\\.', '_') }}
+  when: boost_installed_version|failed or boost_reinstall_from_source
+  become: yes
+
+- name: Build boost.
+  command: >
+    ./b2 \
+      --with-atomic \
+      --with-chrono \
+      --with-coroutine \
+      --with-context \
+      --with-coroutine \
+      --with-coroutine2 \
+      --with-date_time \
+      --with-exception \
+      --with-fiber \
+      --with-filesystem \
+      --with-graph \
+      --with-graph_parallel \
+      --with-iostreams \
+      --with-locale \
+      --with-log \
+      --with-math \
+      --with-metaparse \
+      --with-mpi \
+      --with-program_options \
+      --with-random \
+      --with-regex \
+      --with-serialization \
+      --with-signals \
+      --with-system \
+      --with-test \
+      --with-thread \
+      --with-timer \
+      --with-type_erasure \
+      --with-wave \
+      --layout=system \
+      --prefix={{ boost_install_path }} \
+      threading=multi \
+      runtime-link=shared \
+      link=shared,static \
+      toolset=gcc \
+      python=2.7 \
+      {{ item }}
+    chdir={{ workspace }}/boost_{{ boost_version | regex_replace('\\.', '_') }}
+  with_items:
+    - stage
+    - install
+  when: boost_installed_version|failed or boost_reinstall_from_source
+  become: yes
+
+- name: Run ldconfig
+  shell: ldconfig
+  when: boost_installed_version|failed or boost_reinstall_from_source
+  become: yes
